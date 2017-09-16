@@ -11,32 +11,20 @@
     "type": "git",
     "url": "git+ssh://git@github.com/maggiben/google-apis.git"
   },
-  "main": "index.js",
+  "main": "lib/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "test:spec": "nyc --all --reporter=lcov --reporter=text mocha test/**/*.spec.js",
+    "test:lint": "eslint src",
+    "test:spec": "cross-env BABEL_ENV=test nyc mocha test/**/*.spec.js",
+    "test:typecheck": "flow check",
+    "test:coverage": "flow coverage",
     "start": "babel-node index.js",
-    "build:prod": "babel src --out-dir lib",
-    "start:dev": "npm run build:prod && node ./lib/index.js"
+    "build:release": "babel src --out-dir lib",
+    "start:debugger": "cross-env BABEL_ENV=development nodemon --exec node --require babel-register --inspect --debug-brk src/index.js",
+    "dev": "npm run build:release && node lib/index.js"
   },
   "engines": {
     "node": "6.2.0"
-  },
-  "nyc": {
-    "require": [
-      "babel-register"
-    ],
-    "sourceMap": false,
-    "instrument": false,
-    "check-coverage": true,
-    "per-file": true,
-    "all": true,
-    "exclude": [
-      "tests/**",
-      "lib/**",
-      "src/GoogleApis*.*",
-      "flow-typed/**"
-    ]
   },
   "license": "MIT",
   "dependencies": {
@@ -52,10 +40,14 @@
     "babel-plugin-transform-decorators-legacy": "^1.3.4",
     "babel-preset-env": "^1.6.0",
     "babel-preset-react": "^6.24.1",
-    "babel-preset-stage-2": "^6.24.1",
+    "babel-preset-stage-0": "^6.24.1",
     "babel-register": "^6.26.0",
     "chai": "^4.1.2",
+    "cross-env": "^5.0.5",
+    "eslint": "^4.7.0",
     "eslint-config-airbnb-base": "^12.0.0",
+    "eslint-plugin-flowtype": "^2.35.1",
+    "eslint-plugin-import": "^2.7.0",
     "flow-bin": "^0.54.1",
     "mocha": "^3.5.3",
     "nodemon": "^1.12.1",

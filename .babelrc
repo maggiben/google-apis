@@ -17,10 +17,13 @@
       "compact": false
     }
   },
+  "sourceMaps": true,
+  "compact": false,
   "plugins": [
     ["flow-runtime", {
       "assert": true,
       "annotate": true
-    }]
+    }],
+    "transform-decorators-legacy"
   ]
 }
