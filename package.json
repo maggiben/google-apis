@@ -22,9 +22,10 @@
     "build:clean": "rimraf lib",
     "build:release": "babel src --out-dir lib",
     "start:debugger": "cross-env BABEL_ENV=development nodemon --exec node --require babel-register --inspect --debug-brk src/index.js",
-    "example:u": "nodemon --exec node --require babel-register example/urlshortener.js",
-    "example:y": "nodemon --exec node --require babel-register example/youtube.js",
-    "dev": "npm run build:release && node lib/index.js"
+    "example:urlshortener": "nodemon --exec node --require babel-register example/urlshortener.js",
+    "example:youtube": "nodemon --exec node --require babel-register example/youtube.js",
+    "dev": "npm run build:release && node lib/index.js",
+    "prepublish": "npm run test && npm run build:release"
   },
   "license": "MIT",
   "dependencies": {

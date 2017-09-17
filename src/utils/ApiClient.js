@@ -2,13 +2,13 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // @file         : ApiClient.js                                              //
-// @summary      : Generic Google API Client                                 //
+// @summary      : Dynamic Google API Client builder                         //
 // @version      : 1.0.0                                                     //
 // @project      : N/A                                                       //
 // @description  : Reference: developers.google.com/discovery/v1/reference   //
 // @author       : Benjamin Maggi                                            //
 // @email        : benjaminmaggi@gmail.com                                   //
-// @date         : 22 Jul 2017                                               //
+// @date         : 17 Sep 2017                                               //
 // @license:     : MIT                                                       //
 // ------------------------------------------------------------------------- //
 //                                                                           //

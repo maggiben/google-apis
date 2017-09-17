@@ -2,13 +2,13 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // @file         : ApiDiscovery.js                                           //
-// @summary      : Interface for Google API Discovery Service                //
+// @summary      : Google API Discovery Service interface                    //
 // @version      : 1.0.0                                                     //
 // @project      : N/A                                                       //
 // @description  : Reference: developers.google.com/discovery/v1/reference   //
 // @author       : Benjamin Maggi                                            //
 // @email        : benjaminmaggi@gmail.com                                   //
-// @date         : 22 Jul 2017                                               //
+// @date         : 17 Sep 2017                                               //
 // @license:     : MIT                                                       //
 // ------------------------------------------------------------------------- //
 //                                                                           //
@@ -60,18 +60,6 @@ type ListParams = {
 
 export default class ApiDiscovery {
 
-  discoveryService: ServiceParams = {
-    name: 'discovery',
-    path: 'https://www.googleapis.com/discovery/{version}/apis',
-    version: 'v1',
-    params: {
-      preferred: true
-    }
-  };
-  service: any;
-  discovery: any;
-  cache: Map;
-
   static async list (name: string, preferred?: boolean = true) : Promise<*> {
     const params: ListParams = { name, preferred };
     try {
@@ -101,7 +89,7 @@ export default class ApiDiscovery {
       const item = await this.list('discovery');
       const description = await this.getRest(item);
       this.service = { item, description };
-      return this.service;
+      return this;
     } catch (error) {
       console.error(error);
       return error;
@@ -116,8 +104,7 @@ export default class ApiDiscovery {
       fields: 'schemas'
     };
     try {
-      const { schemas } = await this.getRest(api, params);
-      return schemas;
+      return await this.getRest(api, params);
     } catch (error) {
       console.error(error);
       return error;

@@ -54,7 +54,7 @@ const $http = axios.create({
     if (Array.isArray(fields) && fields.length) {
       params.fields = fields.join(',');
     }
-    // build param entries and clean empty fiels
+    // build param entries and clean null or undefined fiels
     const entries = Object.entries(params).filter(param => param.slice(-1).pop() != null);
     /* $FlowIssue */
     const searchParams: URLSearchParams = new URLSearchParams(entries);
