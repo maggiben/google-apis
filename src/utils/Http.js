@@ -38,14 +38,13 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 
-import { URL, URLSearchParams } from 'url';
+import querystring from 'querystring';
 import axios from 'axios';
 
 type Options = {
   baseURL: string
 };
 
-// export const $http = (options: Options) => axios.create({ defaults, ...options });
 const $http = axios.create({
   baseURL: 'https://www.googleapis.com',
   paramsSerializer(params) {
@@ -54,11 +53,11 @@ const $http = axios.create({
     if (Array.isArray(fields) && fields.length) {
       params.fields = fields.join(',');
     }
-    // build param entries and clean null or undefined fiels
-    const entries = Object.entries(params).filter(param => param.slice(-1).pop() != null);
-    /* $FlowIssue */
-    const searchParams: URLSearchParams = new URLSearchParams(entries);
-    return searchParams.toString();
+    // build querystring and clean null or undefined parameters
+    const query = Object.entries(params)
+      .filter(param => param.slice(-1).pop() != null)
+      .reduce((acc, [key, value]) => Object.assign(acc, { [key]: value }), {});
+    return querystring.stringify(query);
   }
 });
 
@@ -82,6 +81,5 @@ $http.interceptors.response.use(function (response) {
   // Do something with response error
   return Promise.reject(error);
 });
-
 
 export default $http;

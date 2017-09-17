@@ -12,25 +12,32 @@
   ],
   "env": {
     "test": {
-      "plugins": [ "istanbul" ],
-      "sourceMaps": true,
-      "compact": false
+      "plugins": [ "istanbul" ]
+    },
+    "development": {
+      "plugins": [
+        [
+          "flow-runtime", {
+            "assert": true,
+            "annotate": true
+          }
+        ]
+      ]
+    },
+    "production": {
+      "plugins": [
+        "transform-flow-strip-types"
+      ]
     }
   },
   "sourceMaps": true,
   "compact": false,
   "plugins": [
-    [
-      "flow-runtime", {
-        "assert": true,
-        "annotate": true
-      }
-    ],
     "transform-decorators-legacy",
     [
       "transform-runtime", {
         "helpers": false,
-        "polyfill": true,
+        "polyfill": false,
         "regenerator": false
       }
     ]

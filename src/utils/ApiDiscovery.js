@@ -60,7 +60,7 @@ type ListParams = {
 
 export default class ApiDiscovery {
 
-  static async list (name: string, preferred?: boolean = true) : Promise<*> {
+  static async list (name: string, preferred?: boolean) : Promise<*> {
     const params: ListParams = { name, preferred };
     try {
       const { items } = await $http.get('discovery/v1/apis', { params });
