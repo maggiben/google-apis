@@ -1,14 +1,14 @@
 // @flow
 
 ///////////////////////////////////////////////////////////////////////////////
-// @file         : index.js                                                  //
-// @summary      : Library entry point                                       //
+// @file         : Http.js                                                   //
+// @summary      : Http client wrapper                                       //
 // @version      : 1.0.0                                                     //
 // @project      : N/A                                                       //
 // @description  : Reference: developers.google.com/discovery/v1/reference   //
 // @author       : Benjamin Maggi                                            //
 // @email        : benjaminmaggi@gmail.com                                   //
-// @date         : 22 Jul 2017                                               //
+// @date         : 17 Sep 2017                                               //
 // @license:     : MIT                                                       //
 // ------------------------------------------------------------------------- //
 //                                                                           //
@@ -37,5 +37,51 @@
 //                                                                           //
 ///////////////////////////////////////////////////////////////////////////////
 
-export ApiClient from './utils/ApiClient';
-export ApiDiscovery from './utils/ApiDiscovery';
+
+import { URL, URLSearchParams } from 'url';
+import axios from 'axios';
+
+type Options = {
+  baseURL: string
+};
+
+// export const $http = (options: Options) => axios.create({ defaults, ...options });
+const $http = axios.create({
+  baseURL: 'https://www.googleapis.com',
+  paramsSerializer(params) {
+    params = Object.assign({}, params);
+    const { fields } = params;
+    if (Array.isArray(fields) && fields.length) {
+      params.fields = fields.join(',');
+    }
+    // build param entries and clean empty fiels
+    const entries = Object.entries(params).filter(param => param.slice(-1).pop() != null);
+    /* $FlowIssue */
+    const searchParams: URLSearchParams = new URLSearchParams(entries);
+    return searchParams.toString();
+  }
+});
+
+// $http.interceptors.request.use(config => {
+//   console.log('interceptors.request', config)
+//   return config;
+// })
+
+$http.interceptors.response.use(function (response) {
+  const { params } = response.config;
+  if (!params) {
+    return response.data;
+  }
+  else if (Array.isArray(params.fields) && params.fields.length) {
+    console.log('fields skipped');
+  } else if (params.fields && params.fields.length) {
+    console.log('fields', params.fields.split(','));
+  }
+  return response.data;
+}, function (error) {
+  // Do something with response error
+  return Promise.reject(error);
+});
+
+
+export default $http;

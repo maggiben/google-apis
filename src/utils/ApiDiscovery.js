@@ -1,8 +1,8 @@
 // @flow
 
 ///////////////////////////////////////////////////////////////////////////////
-// @file         : index.js                                                  //
-// @summary      : Library entry point                                       //
+// @file         : ApiDiscovery.js                                           //
+// @summary      : Interface for Google API Discovery Service                //
 // @version      : 1.0.0                                                     //
 // @project      : N/A                                                       //
 // @description  : Reference: developers.google.com/discovery/v1/reference   //
@@ -37,5 +37,90 @@
 //                                                                           //
 ///////////////////////////////////////////////////////////////////////////////
 
-export ApiClient from './utils/ApiClient';
-export ApiDiscovery from './utils/ApiDiscovery';
+import axios from 'axios';
+import { URL, URLSearchParams } from 'url';
+import $http from './Http';
+
+type DirectoryItem = {
+  discoveryRestUrl: string,
+  version: string,
+  documentationLink: string
+};
+
+type Api = {
+  id: string,
+  name: string,
+  version: string
+};
+
+type ListParams = {
+  name: string,
+  preferred: boolean
+};
+
+export default class ApiDiscovery {
+
+  discoveryService: ServiceParams = {
+    name: 'discovery',
+    path: 'https://www.googleapis.com/discovery/{version}/apis',
+    version: 'v1',
+    params: {
+      preferred: true
+    }
+  };
+  service: any;
+  discovery: any;
+  cache: Map;
+
+  static async list (name: string, preferred?: boolean = true) : Promise<*> {
+    const params: ListParams = { name, preferred };
+    try {
+      const { items } = await $http.get('discovery/v1/apis', { params });
+      if (params.name && items.length === 1) {
+        return items.reverse().slice(-1).pop();
+      } else {
+        return items;
+      }
+    } catch (error) {
+      console.error(error);
+      return error;
+    }
+  }
+
+  static async getRest (api: string | DirectoryItem, params?: Object) : Promise<*> {
+    try {
+      const { discoveryRestUrl } = (typeof api === 'string' || api instanceof String) ? await ApiDiscovery.list(api) : api;
+      return await $http.get(discoveryRestUrl, { params });
+    } catch (error) {
+      return error;
+    }
+  }
+
+  async init () {
+    try {
+      const item = await this.list('discovery');
+      const description = await this.getRest(item);
+      this.service = { item, description };
+      return this.service;
+    } catch (error) {
+      console.error(error);
+      return error;
+    }
+  }
+
+  list = ApiDiscovery.list;
+  getRest = ApiDiscovery.getRest;
+
+  async getSchemas (api: string | DirectoryItem) : Promise<*> {
+    const params = {
+      fields: 'schemas'
+    };
+    try {
+      const { schemas } = await this.getRest(api, params);
+      return schemas;
+    } catch (error) {
+      console.error(error);
+      return error;
+    }
+  }
+}

@@ -20,10 +20,19 @@
   "sourceMaps": true,
   "compact": false,
   "plugins": [
-    ["flow-runtime", {
-      "assert": true,
-      "annotate": true
-    }],
-    "transform-decorators-legacy"
+    [
+      "flow-runtime", {
+        "assert": true,
+        "annotate": true
+      }
+    ],
+    "transform-decorators-legacy",
+    [
+      "transform-runtime", {
+        "helpers": false,
+        "polyfill": true,
+        "regenerator": false
+      }
+    ]
   ]
 }

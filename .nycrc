@@ -7,7 +7,7 @@
   "check-coverage": true,
   "per-file": true,
   "all": true,
-  "cache": true,
+  "cache": false,
   "reporter": [
     "lcov",
     "text"
