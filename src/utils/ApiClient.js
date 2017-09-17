@@ -46,19 +46,111 @@ type Options = {
   baseURL: string
 };
 
-export default class ApiClient {
+function timeout(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function timer(seconds, resolve) {
+  var remaningTime = seconds;
+  return setTimeout(function() {
+    console.log(remaningTime);
+    if (remaningTime > 0) {
+      return timer(remaningTime - 1, resolve);
+    } else {
+      return resolve();
+    }
+  }, 1000);
+}
+
+function countdown(seconds) {
+  return new Promise(resolve => timer(seconds, resolve));
+}
+
+function getNestedValue(obj, key) {
+  return key.split('.').reduce(function(result, key) {
+    return result[key];
+  }, obj);
+}
+
+function resourceBuilder(domain) {
+  const resource = [];
+  const proxy = new Proxy(async function (...args) {
+    const methods = await domain.serialize();
+    try {
+      const path = resource.join('.');
+      const method = getNestedValue(methods, path);
+      if (method) {
+        return method.apply(domain, args);
+      } else {
+        throw new Error(`Mehod ${path} not available`);
+      }
+    } catch (error) {
+      console.log(error);
+      return error;
+    }
+  }, {
+    has: function () {
+      return true;
+    },
+    get: function (object, property) {
+      resource.push(property);
+      return proxy;
+    },
+    apply: function(object, thisArg, argumentsList) {
+      return Reflect.apply(object, thisArg, argumentsList);
+    }
+  });
+  return proxy;
+}
+
+class ExtendableProxy {
+  constructor() {
+    return new Proxy(this, {
+      has: function (object, prop) {
+        return true;
+      },
+      get: function(object, property, receiver) {
+        if (Reflect.has(object, property)) {
+          return Reflect.get(object, property);
+        } else {
+          if (property === 'init') {
+            return async (...args) => {
+              const serialize = Reflect.get(object, 'serialize', receiver).bind(object);
+              return await serialize();
+            }
+          } else if (property === '$resource') {
+            return resourceBuilder(object);
+          } else {
+            return Reflect.get(object, property);
+          }
+        }
+      }
+    });
+  }
+}
+
+export default class ApiClient extends ExtendableProxy {
 
   constructor ({ api, key, version }) {
+    super();
     this.api = api;
     this.key = key;
     this.version = version;
+    // this.serialize();
   }
 
-  async init (api?: string = this.api) {
+  // async init (api?: string = this.api) {
+  //   return this.$resource;
+  // }
+
+  async serialize (api?: string = this.api) {
+    if (this._resources) {
+      return this._resources;
+    }
+    console.log('run api serialization');
     try {
       const { resources, baseUrl: baseURL } = await ApiDiscovery.getRest(api, { fields: 'resources,baseUrl' });
-      this.$resource = this.buildResources(resources, baseURL);
-      return this;
+      return this._resources = this.buildResources(resources, baseURL);
     } catch (error) {
       console.error(error);
       return error;
@@ -103,43 +195,13 @@ export default class ApiClient {
     };
   }
 
-  buildMethods (methods, baseUrl) {
+  buildMethods (methods, baseURL) {
     return methods.reduce((actions, [ name, { httpMethod, path, parameters, response } ]) => {
-      /*
-      const required = Object
-        .entries(parameters)
-        .filter(([ name, parameter ]) => parameter.required)
-        .map(([ name, parameter ]) => ([name, null]));
-
-      const assumed = Object
-        .entries(parameters)
-        .filter(([ name, parameter ]) => parameter.default)
-        .map(([ name, parameter ]) => ([name, parameter.default]));
-      */
-
       const request = (validator: any, config: any) => {
-        /*
-        const validEntries = Object.entries(parameters);
-        const validKeys = Object.keys(parameters);
-        const requiredKeys = validEntries.filter(([ key, value ]) => value.required).map(([ name, parameter ]) => name);
-        const validSchema = validEntries.reduce((schema, [key, value]) => {
-          return Object.assign({}, schema, {
-            [key]: {
-              type: value.type,
-              default: value.default,
-              minimum: value.minimum,
-              maximum: value.maximum,
-            }
-          });
-        }, {});
-        */
-
         switch (config.method.toUpperCase()) {
-
           case 'GET': {
             return async (params?: Object) => await $http({ ...config, ...{ params }});
           }
-
           case 'POST': {
             if (validator) {
               return async (params?: Object, data?: Object) => await $http({ ...config, ...{ params, data }});
@@ -147,63 +209,19 @@ export default class ApiClient {
               return async (data?: Object) => await $http({ ...config, ...{ data }});
             }
           }
-
           case 'DELETE': {
             return async (params?: Object) => await $http({ ...config, ...{ params }})
           }
-
           default:
             return async (params?: Object) => await $http({ ...config, ...{ params }})
         }
-
-        return async (params?: any, data?: any) => {
-          try {
-
-            /*
-            const hasValidParams = Object.entries(params)
-            .every(function ([key, value]) {
-              return validKeys.includes(key) && skeemas.validate(value, validSchema[key]);
-            });
-
-            const hasRequiredParams = requiredKeys.every(param => {
-              return Object.keys(params).includes(param);
-            });
-            */
-
-            // console.log('validKeys', validKeys)
-            // console.log('requiredKeys', requiredKeys);
-            // console.log('hasValidParams', hasValidParams)
-            // console.log('hasRequiredParams', hasRequiredParams)
-            // console.log('params', params);
-
-            // const req = JSON.stringify({ ...config, ...{ params }},null,2);
-            // console.log('REQ', req);
-            if (parameters) {
-              return await $http({ ...config, ...{ params }});
-            } else if (!parameters && httpMethod.toUpperCase() === 'POST') {
-              return await $http({ ...config, ...{ data: params }});
-            }
-            // console.log('config, params', { ...config, ...{ params }});
-            // return { pageInfo: { config, ...{ params }} };
-          } catch (error) {
-            console.error(error);
-            return error;
-          }
-        }
       }
-
       const validator = parameters ? this.validator(parameters) : null;
-
       return Object.assign({}, actions, {
         [name]: request(validator, { ...$http.defaults.params, ...{
           method: httpMethod,
-          // baseURL: baseUrl,
-          url: path/*,
-          // url: this.service.basePath + path,
-          params: {
-            ...this.dict(required),
-            ...this.dict(assumed)
-          }*/
+          baseURL,
+          url: path
         }})
       });
 
@@ -211,11 +229,11 @@ export default class ApiClient {
   }
 
   buildResources (resources, baseURL) {
-    $http.defaults.baseURL = baseURL;
+    // $http.defaults.baseURL = baseURL;
     $http.defaults.params = { key: this.key };
     return Object.entries(resources).reduce((resources, [ name, { methods } ]) => {
       return Object.assign({}, resources, {
-        [name]: this.buildMethods(Object.entries(methods))
+        [name]: this.buildMethods(Object.entries(methods), baseURL)
       })
     }, {});
   }

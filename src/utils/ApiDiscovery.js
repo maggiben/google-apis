@@ -55,14 +55,14 @@ type Api = {
 
 type ListParams = {
   name: string,
-  preferred: boolean
+  preferred?: boolean
 };
 
 export default class ApiDiscovery {
 
   static async list (name: string, preferred?: boolean) : Promise<*> {
-    const params: ListParams = { name, preferred };
     try {
+      const params: ListParams = { name, preferred };
       const { items } = await $http.get('discovery/v1/apis', { params });
       if (params.name && items.length === 1) {
         return items.reverse().slice(-1).pop();
