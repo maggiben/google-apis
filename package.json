@@ -25,7 +25,7 @@
     "example:urlshortener": "nodemon --exec node --require babel-register example/urlshortener.js",
     "example:youtube": "nodemon --exec node --require babel-register example/youtube.js",
     "dev": "npm run build:release && node lib/index.js",
-    "prepublish": "npm run test && npm run build:release"
+    "prepare": "npm run build:release"
   },
   "license": "MIT",
   "dependencies": {
