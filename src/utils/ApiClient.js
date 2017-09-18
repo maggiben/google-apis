@@ -42,11 +42,14 @@ import axios from 'axios';
 import Ajv from 'ajv';
 import ApiDiscovery from  './ApiDiscovery';
 import DynamicInterface from './DynamicInterface';
-import $http from './Http';
+import { Http } from './Http';
 
 type Options = {
   baseURL: string
 };
+
+// const $http = Http();
+
 
 export default class ApiClient extends DynamicInterface {
 
@@ -76,7 +79,7 @@ export default class ApiClient extends DynamicInterface {
     }
   }
 
-  buildValidator ({ id, description }, { required, defaults }) {
+  validator ({ id, description }, { required, defaults }) {
     const keywords = ['multipleOf', 'maximum', 'exclusiveMaximum', 'minimum', 'exclusiveMinimum', 'maxLength', 'minLength', 'pattern', 'items', 'additionalItems', 'maxItems', 'minItems', 'uniqueItems', 'contains', 'maxProperties', 'minProperties', 'required', 'properties', 'patternProperties', 'additionalProperties', 'dependencies', 'propertyNames', 'enum', 'const', 'type', 'allOf', 'anyOf', 'oneOf', 'not'];
     const ajv = new Ajv({
       allErrors: true,
@@ -103,7 +106,7 @@ export default class ApiClient extends DynamicInterface {
     }
   }
 
-  validator ({ id, description }, parameters: Object, schema: Object) {
+  validate ({ id, description }, parameters: Object, schema: Object) {
     const required = Object
       .entries(parameters)
       .filter(([ name, parameter ]) => parameter.required)
@@ -114,14 +117,18 @@ export default class ApiClient extends DynamicInterface {
       .filter(([ name, parameter ]) => parameter.default)
       .reduce((parameters, [ name, parameter ]) => ({ ...parameters, ...{ [name]: parameter }}), {});
 
-    const validate = this.buildValidator({ id, description }, { required, defaults });
-    return (params?: Object, data?: Object) => validate(params, data);
+    return this.validator({ id, description }, { required, defaults }, schema);
   }
 
-  buildRequest (validator: Function, config: Object) {
+  buildRequest (validate: Function, config: Object) {
+    const $http = Http();
+    // instance.interceptors.response.use(responseHandler, errorHandler);
+    // instance.interceptors.request.use(requestHandler, errorHandler);
+    // $http.defaults.params = { key: this.key };
     return async (params?: Object, data?: Object) => {
       try {
-        if (validator(params, data)) return await $http({ ...config, ...{ params }});
+        // const request = axios.create(Object.create($http.constructor)).bind($http);
+        if (validate(params, data)) return await $http({ ...config, ...{ params }});
       } catch (error) {
         console.error(error);
         throw error;
@@ -129,20 +136,83 @@ export default class ApiClient extends DynamicInterface {
     }
   }
 
-  buildMethods (methods, schemas, baseURL) {
-    return Object.entries(methods).reduce((actions, [ name, { id, httpMethod, description, path, parameters, request, response } ]) => {
-      const schema = Object.entries({ request, response })
-        .filter(([ entry, { $ref } = {} ]) => ($ref))
-        .reduce(( definitions, [ entry, { $ref } = {}] ) => ({ ...definitions, ...{ [entry]: schemas[$ref] }}), {});
+  buildInterceptorsXX (schema, { request, response }) {
+    console.log({ request, response })
+    // const interceptors = Object.entries({ request, response })
+      // .filter(([interceptor, $ref]) => ($ref))
 
-      const validator = parameters ? this.validator({ id, description }, parameters, schema) : null;
-      const config = { ...$http.defaults.params, ...{ method: httpMethod, baseURL, url: path }};
-      return { ...actions, ...{ [name]: this.buildRequest(validator, config) }};
+    // const hash = interceptors.reduce((interceptors, [interceptor, { $ref }]) => ({...interceptors, ...{ [interceptor]: schema[$ref] }}), {});
+    // console.log('interceptors:', JSON.stringify(hash,0,2));
+    // console.log('interceptors:', JSON.stringify(interceptors,0,2));
+    console.log('=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-')
+    console.log('=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-')
+    console.log('=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-')
+    console.log(JSON.stringify(Object.assign(...[{ request }, { response }]),0,2))
+    process.exit()
+    return interceptors;
+  }
+
+  buildInterceptors (schema, method) {
+    const [ name, { request, response, id, path, parameters, httpMethod }] = method;
+    // const interceptors = [{ request, id, name }, { response, id, name }]
+    // .reduce((interceptors, method) => {
+    //   const { id, request, response } = method;
+    //   const cosa = [
+    //     ...( ('request' in method) ? [{ request: { ...request }.$ref }] : []),
+    //     ...( ('response' in method) ? [{ response: { ...response }.$ref } ] : [])
+    //   ];
+    //   console.log(cosa)
+    //   return ({...interceptors, ...{
+    //     ...( ('request' in method) ? request: {
+    //         id,
+    //         schema: schema[ { ...request }.$ref ],
+    //         $ref: { ...request }.$ref
+    //       } : {}),
+    //     ...( ('response' in method) ? response: {
+    //         id,
+    //         schema: schema[ { ...response }.$ref ],
+    //         $ref: { ...response }.$ref
+    //       } : {})
+    //   }});
+    // }, {});
+
+    const interceptors = {
+      request: {
+        id,
+        schema: schema[ { ...request }.$ref ],
+        $ref: { ...request }.$ref
+      },
+      response: {
+        id,
+        schema: schema[ { ...response }.$ref ],
+        $ref: { ...response }.$ref
+      }
+    };
+    console.log('=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-');
+    console.log('interceptors', JSON.stringify(interceptors,0,2))
+    // return Object.assign(...interceptors);
+    return interceptors;
+  }
+
+  buildMethods (methods, schema, baseURL) {
+    const workers = Object.entries(methods).reduce((actions, method) => {
+      // const [ name, { id, httpMethod, description, path, parameters, request, response }] = method;
+      const interceptors = this.buildInterceptors(schema, method);
+
+      // const validate = parameters ? this.validate({ id, description }, parameters, interceptors) : null;
+      // const config = { ...$http.defaults.params, ...{ method: httpMethod, baseURL, url: path }};
+      // const config = { method: httpMethod, baseURL, url: path };
+      // console.log(JSON.stringify(config,0,2))
+      // console.log($http.interceptors, $http.defaults)
+      // process.exit()
+      // return { ...actions, ...{ [name]: this.buildRequest(validate, config) }};
     }, {});
+    console.log(JSON.stringify(workers,0,2));
+    return workers;
   }
 
   buildResources (resources, schemas, baseURL) {
-    $http.defaults.params = { key: this.key };
+    // $http.defaults.params = { key: this.key };
     return Object.entries(resources).reduce((resources, [ name, { methods } ]) => {
       return { ...resources, ...{ [name]: this.buildMethods(methods, schemas, baseURL) }};
     }, {});

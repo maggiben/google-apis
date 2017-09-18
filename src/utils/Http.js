@@ -39,13 +39,89 @@
 
 
 import querystring from 'querystring';
-import axios from 'axios';
+import axios, { Axios } from 'axios';
 
 type Options = {
   baseURL: string
 };
 
-const $http = axios.create({
+export const Http = function (config) {
+
+  const paramsSerializer = params => {
+    params = Object.assign({}, params);
+    const { fields, id } = params;
+    if (Array.isArray(fields) && fields.length) {
+      params.fields = fields.join(',');
+    }
+
+    if (Array.isArray(id) && id.length) {
+      params.id = id.join(',');
+      params.maxResults = id.length;
+    } else if (id && id.length) {
+      params.maxResults = id.split(',').length;
+    }
+    // build querystring and clean null or undefined parameters
+    const query = Object.entries(params)
+      .filter(param => param.slice(-1).pop() != null)
+      .reduce((acc, [key, value]) => Object.assign(acc, { [key]: value }), {});
+    return querystring.stringify(query);
+  };
+
+  const responseHandler = response => {
+    // console.log('response.interceptor', response);
+    const { params } = response.config;
+    if (!params) {
+      return response.data;
+    }
+    else if (Array.isArray(params.fields) && params.fields.length) {
+      console.log('fields skipped');
+    } else if (params.fields && params.fields.length) {
+      console.log('fields', params.fields.split(','));
+    }
+    return response.data;
+  };
+
+  const requestHandler = config => {
+    // console.log('request.interceptor', config);
+    return config;
+  }
+
+  const errorHandler = error => {
+    if (error.response) {
+      // The request was made and the server responded with a status code
+      // that falls out of the range of 2xx
+      console.log(error.response.data);
+      console.log(error.response.status);
+      console.log(error.response.headers);
+      return Promise.reject(error);
+    } else if (error.request) {
+      // The request was made but no response was received
+      // `error.request` is an instance of XMLHttpRequest in the browser and an instance of
+      // http.ClientRequest in node.js
+      console.log(error.request);
+      return Promise.reject(error);
+    } else {
+      // Something happened in setting up the request that triggered an Error
+      console.log('Error', error.message);
+      return Promise.reject(error);
+    }
+    console.log(error.config);
+    return Promise.reject(error);
+  }
+
+  const defaults = {
+    baseURL: 'https://www.googleapis.com',
+    paramsSerializer: paramsSerializer
+  };
+
+  const instance = axios.create(defaults);
+  instance.instanceId = Math.random().toString(36).substr(2, 10).toUpperCase();
+  instance.interceptors.response.use(responseHandler, errorHandler);
+  instance.interceptors.request.use(requestHandler, errorHandler);
+  return instance;
+}
+
+const config = {
   baseURL: 'https://www.googleapis.com',
   paramsSerializer(params) {
     params = Object.assign({}, params);
@@ -66,14 +142,9 @@ const $http = axios.create({
       .reduce((acc, [key, value]) => Object.assign(acc, { [key]: value }), {});
     return querystring.stringify(query);
   }
-});
+};
 
-// $http.interceptors.request.use(config => {
-//   console.log('interceptors.request', config)
-//   return config;
-// })
-
-$http.interceptors.response.use(function (response) {
+const response = [function (response) {
   const { params } = response.config;
   if (!params) {
     return response.data;
@@ -87,6 +158,14 @@ $http.interceptors.response.use(function (response) {
 }, function (error) {
   // Do something with response error
   return Promise.reject(error);
-});
+}];
 
+// $http.interceptors.request.use(config => {
+//   console.log('interceptors.request', config)
+//   return config;
+// })
+
+const $http = axios.create(Object.assign({}, config));
+$http.interceptors.response.use(...Array.from(response));
+$http.instanceId = Math.random().toString(36).substr(2, 10).toUpperCase();
 export default $http;
