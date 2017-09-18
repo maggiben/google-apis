@@ -1,8 +1,8 @@
 // @flow
 
 ///////////////////////////////////////////////////////////////////////////////
-// @file         : Http.js                                                   //
-// @summary      : Http client wrapper                                       //
+// @file         : DynamicInterface.js                                       //
+// @summary      : Dynamic interface builder                                 //
 // @version      : 1.0.0                                                     //
 // @project      : N/A                                                       //
 // @description  : Reference: developers.google.com/discovery/v1/reference   //
@@ -38,55 +38,69 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 
-import querystring from 'querystring';
 import axios from 'axios';
+import ApiDiscovery from  './ApiDiscovery';
+import $http from './Http';
 
 type Options = {
   baseURL: string
 };
 
-const $http = axios.create({
-  baseURL: 'https://www.googleapis.com',
-  paramsSerializer(params) {
-    params = Object.assign({}, params);
-    const { fields, id } = params;
-    if (Array.isArray(fields) && fields.length) {
-      params.fields = fields.join(',');
+type Interfaces = {
+  serializer?: string
+};
+
+function builder (target: any, serializer: Function) {
+  const resource = [];
+
+  const emitter = async function (...args) {
+    const methods = await serializer();
+    try {
+      const method = resource.reduce((result, key) => result[key], methods);
+      if (method) {
+        console.log(`Call method ${resource.join('.')}`);
+        return method.apply(target, args);
+      } else {
+        throw new Error(`Mehod ${resource.join('.')} not available`);
+      }
+    } catch (error) {
+      console.log(error);
+      return error;
     }
+  };
 
-    if (Array.isArray(id) && id.length) {
-      params.id = id.join(',');
-      params.maxResults = id.length;
-    } else if (id && id.length) {
-      params.maxResults = id.split(',').length;
+  const handler = {
+    has: function () {
+      return true;
+    },
+    get: function (object, property) {
+      resource.push(property);
+      return proxy;
+    },
+    apply: function(object, thisArg, argumentsList) {
+      return Reflect.apply(object, thisArg, argumentsList);
     }
-    // build querystring and clean null or undefined parameters
-    const query = Object.entries(params)
-      .filter(param => param.slice(-1).pop() != null)
-      .reduce((acc, [key, value]) => Object.assign(acc, { [key]: value }), {});
-    return querystring.stringify(query);
-  }
-});
+  };
+  const proxy = new Proxy(emitter, handler);
 
-// $http.interceptors.request.use(config => {
-//   console.log('interceptors.request', config)
-//   return config;
-// })
+  return proxy;
+}
 
-$http.interceptors.response.use(function (response) {
-  const { params } = response.config;
-  if (!params) {
-    return response.data;
+export default class DynamicInterface {
+  constructor(interfaces: Interfaces) {
+    const handler = {
+      has: function (object, prop) {
+        return true;
+      },
+      get: function(object, property, receiver) {
+        if (Reflect.has(object, property)) {
+          return Reflect.get(object, property);
+        } else {
+          const { serializer } = interfaces[property];
+          return serializer ? builder(object, Reflect.get(object, serializer).bind(object)) : Reflect.get(object, property, receiver);
+        }
+      }
+    };
+    return new Proxy(this, handler);
   }
-  else if (Array.isArray(params.fields) && params.fields.length) {
-    console.log('fields skipped');
-  } else if (params.fields && params.fields.length) {
-    console.log('fields', params.fields.split(','));
-  }
-  return response.data;
-}, function (error) {
-  // Do something with response error
-  return Promise.reject(error);
-});
-
-export default $http;
+}

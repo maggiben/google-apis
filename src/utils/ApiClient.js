@@ -39,109 +39,28 @@
 
 
 import axios from 'axios';
+import Ajv from 'ajv';
 import ApiDiscovery from  './ApiDiscovery';
+import DynamicInterface from './DynamicInterface';
 import $http from './Http';
 
 type Options = {
   baseURL: string
 };
 
-function timeout(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function timer(seconds, resolve) {
-  var remaningTime = seconds;
-  return setTimeout(function() {
-    console.log(remaningTime);
-    if (remaningTime > 0) {
-      return timer(remaningTime - 1, resolve);
-    } else {
-      return resolve();
-    }
-  }, 1000);
-}
-
-function countdown(seconds) {
-  return new Promise(resolve => timer(seconds, resolve));
-}
-
-function getNestedValue(obj, key) {
-  return key.split('.').reduce(function(result, key) {
-    return result[key];
-  }, obj);
-}
-
-function resourceBuilder(domain) {
-  const resource = [];
-  const proxy = new Proxy(async function (...args) {
-    const methods = await domain.serialize();
-    try {
-      const path = resource.join('.');
-      const method = getNestedValue(methods, path);
-      if (method) {
-        return method.apply(domain, args);
-      } else {
-        throw new Error(`Mehod ${path} not available`);
-      }
-    } catch (error) {
-      console.log(error);
-      return error;
-    }
-  }, {
-    has: function () {
-      return true;
-    },
-    get: function (object, property) {
-      resource.push(property);
-      return proxy;
-    },
-    apply: function(object, thisArg, argumentsList) {
-      return Reflect.apply(object, thisArg, argumentsList);
-    }
-  });
-  return proxy;
-}
-
-class ExtendableProxy {
-  constructor() {
-    return new Proxy(this, {
-      has: function (object, prop) {
-        return true;
-      },
-      get: function(object, property, receiver) {
-        if (Reflect.has(object, property)) {
-          return Reflect.get(object, property);
-        } else {
-          if (property === 'init') {
-            return async (...args) => {
-              const serialize = Reflect.get(object, 'serialize', receiver).bind(object);
-              return await serialize();
-            }
-          } else if (property === '$resource') {
-            return resourceBuilder(object);
-          } else {
-            return Reflect.get(object, property);
-          }
-        }
-      }
-    });
-  }
-}
-
-export default class ApiClient extends ExtendableProxy {
+export default class ApiClient extends DynamicInterface {
 
   constructor ({ api, key, version }) {
-    super();
+    const interfaces = {
+      '$resource': {
+        serializer: 'serialize'
+      }
+    };
+    super(interfaces);
     this.api = api;
     this.key = key;
     this.version = version;
-    // this.serialize();
   }
-
-  // async init (api?: string = this.api) {
-  //   return this.$resource;
-  // }
 
   async serialize (api?: string = this.api) {
     if (this._resources) {
@@ -149,92 +68,83 @@ export default class ApiClient extends ExtendableProxy {
     }
     console.log('run api serialization');
     try {
-      const { resources, baseUrl: baseURL } = await ApiDiscovery.getRest(api, { fields: 'resources,baseUrl' });
-      return this._resources = this.buildResources(resources, baseURL);
+      const { resources, schemas, baseUrl: baseURL } = await ApiDiscovery.getRest(api, { fields: 'resources,schemas,baseUrl' });
+      return this._resources = this.buildResources(resources, schemas, baseURL);
     } catch (error) {
       console.error(error);
       return error;
     }
   }
 
-  dict (entries) {
-    if(Array.isArray(entries) && entries.length) {
-      return Object.assign({}, ...entries.map( ([key, value]) => ({[key]: value}) ));
-    } else {
-      return null;
+  buildValidator ({ id, description }, { required, defaults }) {
+    const keywords = ['multipleOf', 'maximum', 'exclusiveMaximum', 'minimum', 'exclusiveMinimum', 'maxLength', 'minLength', 'pattern', 'items', 'additionalItems', 'maxItems', 'minItems', 'uniqueItems', 'contains', 'maxProperties', 'minProperties', 'required', 'properties', 'patternProperties', 'additionalProperties', 'dependencies', 'propertyNames', 'enum', 'const', 'type', 'allOf', 'anyOf', 'oneOf', 'not'];
+    const ajv = new Ajv({
+      allErrors: true,
+      useDefaults: true,
+      // removeAdditional: true,
+      coerceTypes: true,
+      unknownFormats: ['uint32', 'int32', 'uint64', 'int64', 'double'],
+      validateSchema: false
+    });
+    const schema = {
+      'type': 'object',
+      'id': id,
+      'description': description,
+      'required': Object.keys(required),
+      // 'additionalProperties': false,
+      'properties': { ...required, ...defaults }
+    };
+    return (params?: Object, data?: Object) => {
+      const valid = ajv.validate(schema, params);
+      if (!valid)
+        throw new Error(ajv.errorsText());
+      else
+        return valid;
     }
   }
 
-  validator (parameters: any) {
+  validator ({ id, description }, parameters: Object, schema: Object) {
     const required = Object
       .entries(parameters)
       .filter(([ name, parameter ]) => parameter.required)
-      .map(([ name, parameter ]) => name);
+      .reduce((parameters, [ name, parameter ]) => ({ ...parameters, ...{ [name]: parameter }}), {});
 
-    const assumed = Object
+    const defaults = Object
       .entries(parameters)
       .filter(([ name, parameter ]) => parameter.default)
-      .map(([ name, parameter ]) => ([ name, parameter.default ]));
+      .reduce((parameters, [ name, parameter ]) => ({ ...parameters, ...{ [name]: parameter }}), {});
 
-    const entries = Object.entries(parameters);
-    const keys = Object.keys(parameters);
-    // const requiredX = entries.filter(([ key, value ]) => value.required).map(([ name, parameter ]) => name);
-    const schema = entries.reduce((schema, [ key, value ]) => {
-      return Object.assign({}, schema, {
-        [key]: {
-          type: value.type,
-          default: value.default,
-          minimum: value.minimum,
-          maximum: value.maximum,
-        }
-      });
-    }, {});
-
-    return function (expression: any) {
-      return true;
-    };
+    const validate = this.buildValidator({ id, description }, { required, defaults });
+    return (params?: Object, data?: Object) => validate(params, data);
   }
 
-  buildMethods (methods, baseURL) {
-    return methods.reduce((actions, [ name, { httpMethod, path, parameters, response } ]) => {
-      const request = (validator: any, config: any) => {
-        switch (config.method.toUpperCase()) {
-          case 'GET': {
-            return async (params?: Object) => await $http({ ...config, ...{ params }});
-          }
-          case 'POST': {
-            if (validator) {
-              return async (params?: Object, data?: Object) => await $http({ ...config, ...{ params, data }});
-            } else {
-              return async (data?: Object) => await $http({ ...config, ...{ data }});
-            }
-          }
-          case 'DELETE': {
-            return async (params?: Object) => await $http({ ...config, ...{ params }})
-          }
-          default:
-            return async (params?: Object) => await $http({ ...config, ...{ params }})
-        }
+  buildRequest (validator: Function, config: Object) {
+    return async (params?: Object, data?: Object) => {
+      try {
+        if (validator(params, data)) return await $http({ ...config, ...{ params }});
+      } catch (error) {
+        console.error(error);
+        throw error;
       }
-      const validator = parameters ? this.validator(parameters) : null;
-      return Object.assign({}, actions, {
-        [name]: request(validator, { ...$http.defaults.params, ...{
-          method: httpMethod,
-          baseURL,
-          url: path
-        }})
-      });
+    }
+  }
 
+  buildMethods (methods, schemas, baseURL) {
+    return Object.entries(methods).reduce((actions, [ name, { id, httpMethod, description, path, parameters, request, response } ]) => {
+      const schema = Object.entries({ request, response })
+        .filter(([ entry, { $ref } = {} ]) => ($ref))
+        .reduce(( definitions, [ entry, { $ref } = {}] ) => ({ ...definitions, ...{ [entry]: schemas[$ref] }}), {});
+
+      const validator = parameters ? this.validator({ id, description }, parameters, schema) : null;
+      const config = { ...$http.defaults.params, ...{ method: httpMethod, baseURL, url: path }};
+      return { ...actions, ...{ [name]: this.buildRequest(validator, config) }};
     }, {});
   }
 
-  buildResources (resources, baseURL) {
-    // $http.defaults.baseURL = baseURL;
+  buildResources (resources, schemas, baseURL) {
     $http.defaults.params = { key: this.key };
     return Object.entries(resources).reduce((resources, [ name, { methods } ]) => {
-      return Object.assign({}, resources, {
-        [name]: this.buildMethods(Object.entries(methods), baseURL)
-      })
+      return { ...resources, ...{ [name]: this.buildMethods(methods, schemas, baseURL) }};
     }, {});
   }
 }
