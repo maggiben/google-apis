@@ -54,8 +54,8 @@ function builder (target: any, serializer: Function) {
   const resource = [];
 
   const emitter = async function (...args) {
-    const methods = await serializer();
     try {
+      const methods = await serializer();
       const method = resource.reduce((result, key) => result[key], methods);
       if (method) {
         console.log(`Call method ${resource.join('.')}`);
@@ -65,7 +65,7 @@ function builder (target: any, serializer: Function) {
       }
     } catch (error) {
       console.log(error);
-      return error;
+      throw new Error(error);
     }
   };
 

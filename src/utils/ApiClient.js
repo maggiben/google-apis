@@ -48,13 +48,15 @@ type Options = {
   baseURL: string
 };
 
+type Interceptor = Object | Function | Promise<*>;
+
 export default class ApiClient extends DynamicInterface {
 
   httpOptions: Object;
   api: string;
   key: string;
 
-  constructor ({ api, key, version }) {
+  constructor (api: string, httpOptions: Object) {
     const interfaces = {
       '$resource': {
         serializer: 'serialize'
@@ -62,21 +64,18 @@ export default class ApiClient extends DynamicInterface {
     };
     super(interfaces);
     this.api = api;
-    this.key = key;
-    this.version = version;
+    this.httpOptions = httpOptions;
+    this.cache = new Map();
   }
 
   async serialize (api?: string = this.api) {
-    if (this._resources) {
-      return this._resources;
-    }
+    if (this.cache.has(api)) return this.cache.get(api);
     console.log('run api serialization');
     try {
       const { resources, schemas, baseUrl: baseURL } = await ApiDiscovery.getRest(api, { fields: 'resources,schemas,baseUrl' });
-      this.httpOptions = {
-        baseURL
-      };
-      return this._resources = this.buildResources(resources, schemas, this.httpOptions);
+      const resourceHandlers = this.buildResources(resources, schemas, { baseURL, ...this.httpOptions });
+      this.cache.set(api, resourceHandlers);
+      return Object.assign({}, resourceHandlers);
     } catch (error) {
       console.error(error);
       return error;
@@ -144,68 +143,35 @@ export default class ApiClient extends DynamicInterface {
       request:  { name, schemas: schemas[ {...request  }.$ref ], $ref: {...request  }.$ref, ...{config}},
       response: { name, schemas: schemas[ {...response }.$ref ], $ref: {...response }.$ref, ...{config}}
     };
+    $http.defaults.url = config.path;
+    $http.defaults.method = config.httpMethod;
     $http.interceptors.response.use(this.responseHandler, this.errorHandler);
     $http.interceptors.request.use(this.requestHandler, this.errorHandler);
-    return interceptor;
-    // return async (...args: any) => {
-    //   console.log('call interceptor', interceptor.name, interceptor.id, interceptor.path)
-    //   try {
-    //     return await interceptor.$http(...args);
-    //   } catch (error) {
-    //     throw error;
-    //   }
-    // }
+    const bypass = async (...args: any) => await $http(...args)
+    return bypass.bind(interceptor);
   }
 
   buildMethods (methods: Object, schemas: Object, httpOptions?: Object) {
-    const workers = Object.entries(methods).reduce((actions, method) => {
+    return Object
+    .entries(methods)
+    .reduce((actions, method) => {
       const [ name, config ] = method;
       const interceptor = this.buildInterceptor(schemas, method, httpOptions);
-      // const validate = parameters ? this.validate({ id, description }, parameters, interceptors) : null;
-      // const config = { ...$http.defaults.params, ...{ method: httpMethod, baseURL, url: path }};
-      // const config = { method: httpMethod, baseURL, url: path };
-      // console.log('=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-')
-      // console.log('=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-')
-      // console.log('=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-')
-      // console.log('INTERCEPTOR', Object.keys(interceptors.request), Object.keys(interceptors.response))
-      // console.log('interceptor:', JSON.stringify(interceptor,0,2))
-      // return { ...actions, ...{ [name]: this.buildRequest(validate, config) }};
-      // return { ...actions, ...{ [name]: this.buildRequest(interceptor) }};
-      // console.log('actions', name, config.id, config.path, config.description, typeof interceptor);
-      process.exit()
-      return { actions, ...{ [name]: (...args) => {} }};
+      const httpHandler = this.buildRequest(interceptor)
+      return {...actions, ...{ [name]: httpHandler }};
     }, {});
-    console.log('worker', JSON.stringify(workers,0,2));
-    return workers;
   }
 
-  buildResources (resources: Object, schemas: Object, httpOptions?: Object) {
+  buildResources (resources, schemas, httpOptions) {
     return Object
     .entries(resources)
-    .reduce((resoruces, [ name, { methods } ]) => ({ ...resoruces, ...{ [name]: this.buildMethods(methods, schemas, httpOptions) }}), {});
+    .reduce((resources, [ name, { methods } ]) => ({ ...resources, ...{ [name]: this.buildMethods(methods, schemas, httpOptions) }}), {});
   }
-
   responseHandler (response) {
-    // console.log('response.interceptor', response);
-    const { params } = response.config;
-    if (!params) {
-      return response.data;
-    }
-    else if (Array.isArray(params.fields) && params.fields.length) {
-      console.log('fields skipped');
-    } else if (params.fields && params.fields.length) {
-      console.log('fields', params.fields.split(','));
-    }
-    return response.data;
+    return response;
   };
-
   requestHandler (config) {
-    // console.log('request.interceptor', config);
-    // return config;
-    return false;
+    return config;
   }
-
-  errorHandler (error) {
-    return Promise.reject(error);
-  }
+  errorHandler (error) { return Promise.reject(error); }
 }

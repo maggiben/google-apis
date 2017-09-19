@@ -75,21 +75,11 @@ export const Http = function (config) {
   };
 
   const responseHandler = response => {
-    // console.log('response.interceptor', response);
     const { params } = response.config;
-    if (!params) {
-      return response.data;
-    }
-    else if (Array.isArray(params.fields) && params.fields.length) {
-      console.log('fields skipped');
-    } else if (params.fields && params.fields.length) {
-      console.log('fields', params.fields.split(','));
-    }
     return response.data;
   };
 
   const requestHandler = config => {
-    // console.log('request.interceptor', config);
     return config;
   }
 
