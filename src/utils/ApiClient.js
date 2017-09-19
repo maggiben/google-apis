@@ -48,10 +48,11 @@ type Options = {
   baseURL: string
 };
 
-// const $http = Http();
-
-
 export default class ApiClient extends DynamicInterface {
+
+  httpOptions: Object;
+  api: string;
+  key: string;
 
   constructor ({ api, key, version }) {
     const interfaces = {
@@ -72,7 +73,10 @@ export default class ApiClient extends DynamicInterface {
     console.log('run api serialization');
     try {
       const { resources, schemas, baseUrl: baseURL } = await ApiDiscovery.getRest(api, { fields: 'resources,schemas,baseUrl' });
-      return this._resources = this.buildResources(resources, schemas, baseURL);
+      this.httpOptions = {
+        baseURL
+      };
+      return this._resources = this.buildResources(resources, schemas, this.httpOptions);
     } catch (error) {
       console.error(error);
       return error;
@@ -120,15 +124,10 @@ export default class ApiClient extends DynamicInterface {
     return this.validator({ id, description }, { required, defaults }, schema);
   }
 
-  buildRequest (validate: Function, config: Object) {
-    const $http = Http();
-    // instance.interceptors.response.use(responseHandler, errorHandler);
-    // instance.interceptors.request.use(requestHandler, errorHandler);
-    // $http.defaults.params = { key: this.key };
+  buildRequest (interceptor: Interceptor) : Function {
     return async (params?: Object, data?: Object) => {
       try {
-        // const request = axios.create(Object.create($http.constructor)).bind($http);
-        if (validate(params, data)) return await $http({ ...config, ...{ params }});
+        return await interceptor({ params, data });
       } catch (error) {
         console.error(error);
         throw error;
@@ -136,85 +135,77 @@ export default class ApiClient extends DynamicInterface {
     }
   }
 
-  buildInterceptorsXX (schema, { request, response }) {
-    console.log({ request, response })
-    // const interceptors = Object.entries({ request, response })
-      // .filter(([interceptor, $ref]) => ($ref))
-
-    // const hash = interceptors.reduce((interceptors, [interceptor, { $ref }]) => ({...interceptors, ...{ [interceptor]: schema[$ref] }}), {});
-    // console.log('interceptors:', JSON.stringify(hash,0,2));
-    // console.log('interceptors:', JSON.stringify(interceptors,0,2));
-    console.log('=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-')
-    console.log('=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-')
-    console.log('=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-')
-    console.log(JSON.stringify(Object.assign(...[{ request }, { response }]),0,2))
-    process.exit()
-    return interceptors;
-  }
-
-  buildInterceptors (schema, method) {
-    const [ name, { request, response, id, path, parameters, httpMethod }] = method;
-    // const interceptors = [{ request, id, name }, { response, id, name }]
-    // .reduce((interceptors, method) => {
-    //   const { id, request, response } = method;
-    //   const cosa = [
-    //     ...( ('request' in method) ? [{ request: { ...request }.$ref }] : []),
-    //     ...( ('response' in method) ? [{ response: { ...response }.$ref } ] : [])
-    //   ];
-    //   console.log(cosa)
-    //   return ({...interceptors, ...{
-    //     ...( ('request' in method) ? request: {
-    //         id,
-    //         schema: schema[ { ...request }.$ref ],
-    //         $ref: { ...request }.$ref
-    //       } : {}),
-    //     ...( ('response' in method) ? response: {
-    //         id,
-    //         schema: schema[ { ...response }.$ref ],
-    //         $ref: { ...response }.$ref
-    //       } : {})
-    //   }});
-    // }, {});
-
-    const interceptors = {
-      request: {
-        id,
-        schema: schema[ { ...request }.$ref ],
-        $ref: { ...request }.$ref
-      },
-      response: {
-        id,
-        schema: schema[ { ...response }.$ref ],
-        $ref: { ...response }.$ref
-      }
+  buildInterceptor (schemas: Object, method: Object, httpOptions: Object) {
+    const $http = Http(httpOptions);
+    const [ name, config ] = method;
+    const { response, request} = config;
+    const interceptor = {
+      $http,
+      request:  { name, schemas: schemas[ {...request  }.$ref ], $ref: {...request  }.$ref, ...{config}},
+      response: { name, schemas: schemas[ {...response }.$ref ], $ref: {...response }.$ref, ...{config}}
     };
-    console.log('=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-');
-    console.log('interceptors', JSON.stringify(interceptors,0,2))
-    // return Object.assign(...interceptors);
-    return interceptors;
+    $http.interceptors.response.use(this.responseHandler, this.errorHandler);
+    $http.interceptors.request.use(this.requestHandler, this.errorHandler);
+    return interceptor;
+    // return async (...args: any) => {
+    //   console.log('call interceptor', interceptor.name, interceptor.id, interceptor.path)
+    //   try {
+    //     return await interceptor.$http(...args);
+    //   } catch (error) {
+    //     throw error;
+    //   }
+    // }
   }
 
-  buildMethods (methods, schema, baseURL) {
+  buildMethods (methods: Object, schemas: Object, httpOptions?: Object) {
     const workers = Object.entries(methods).reduce((actions, method) => {
-      // const [ name, { id, httpMethod, description, path, parameters, request, response }] = method;
-      const interceptors = this.buildInterceptors(schema, method);
-
+      const [ name, config ] = method;
+      const interceptor = this.buildInterceptor(schemas, method, httpOptions);
       // const validate = parameters ? this.validate({ id, description }, parameters, interceptors) : null;
       // const config = { ...$http.defaults.params, ...{ method: httpMethod, baseURL, url: path }};
       // const config = { method: httpMethod, baseURL, url: path };
-      // console.log(JSON.stringify(config,0,2))
-      // console.log($http.interceptors, $http.defaults)
-      // process.exit()
+      // console.log('=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-')
+      // console.log('=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-')
+      // console.log('=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-')
+      // console.log('INTERCEPTOR', Object.keys(interceptors.request), Object.keys(interceptors.response))
+      // console.log('interceptor:', JSON.stringify(interceptor,0,2))
       // return { ...actions, ...{ [name]: this.buildRequest(validate, config) }};
+      // return { ...actions, ...{ [name]: this.buildRequest(interceptor) }};
+      // console.log('actions', name, config.id, config.path, config.description, typeof interceptor);
+      process.exit()
+      return { actions, ...{ [name]: (...args) => {} }};
     }, {});
-    console.log(JSON.stringify(workers,0,2));
+    console.log('worker', JSON.stringify(workers,0,2));
     return workers;
   }
 
-  buildResources (resources, schemas, baseURL) {
-    // $http.defaults.params = { key: this.key };
-    return Object.entries(resources).reduce((resources, [ name, { methods } ]) => {
-      return { ...resources, ...{ [name]: this.buildMethods(methods, schemas, baseURL) }};
-    }, {});
+  buildResources (resources: Object, schemas: Object, httpOptions?: Object) {
+    return Object
+    .entries(resources)
+    .reduce((resoruces, [ name, { methods } ]) => ({ ...resoruces, ...{ [name]: this.buildMethods(methods, schemas, httpOptions) }}), {});
+  }
+
+  responseHandler (response) {
+    // console.log('response.interceptor', response);
+    const { params } = response.config;
+    if (!params) {
+      return response.data;
+    }
+    else if (Array.isArray(params.fields) && params.fields.length) {
+      console.log('fields skipped');
+    } else if (params.fields && params.fields.length) {
+      console.log('fields', params.fields.split(','));
+    }
+    return response.data;
+  };
+
+  requestHandler (config) {
+    // console.log('request.interceptor', config);
+    // return config;
+    return false;
+  }
+
+  errorHandler (error) {
+    return Promise.reject(error);
   }
 }

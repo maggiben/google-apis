@@ -47,6 +47,13 @@ type Options = {
 
 export const Http = function (config) {
 
+  const sanitizeConfig = config => {
+    return {
+      url: path,
+      baseURL: baseUrl
+    };
+  };
+
   const paramsSerializer = params => {
     params = Object.assign({}, params);
     const { fields, id } = params;
@@ -114,7 +121,7 @@ export const Http = function (config) {
     paramsSerializer: paramsSerializer
   };
 
-  const instance = axios.create(defaults);
+  const instance = axios.create({ defaults, ...config });
   instance.instanceId = Math.random().toString(36).substr(2, 10).toUpperCase();
   instance.interceptors.response.use(responseHandler, errorHandler);
   instance.interceptors.request.use(requestHandler, errorHandler);
