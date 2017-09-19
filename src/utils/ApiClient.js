@@ -47,14 +47,26 @@ import { Http } from './Http';
 type Options = {
   baseURL: string
 };
-
 type Interceptor = Object | Function | Promise<*>;
+
+const VALIDATOROPTIONS = {
+  allErrors: true,
+  useDefaults: true,
+  coerceTypes: true,
+  unknownFormats: ['uint32', 'int32', 'uint64', 'int64', 'double'],
+  validateSchema: false
+};
 
 export default class ApiClient extends DynamicInterface {
 
   httpOptions: Object;
   api: string;
-  key: string;
+  // $FlowIssue
+  // Cache: Map;
+  // $FlowIssue
+  // Interceptors: Map;
+  // $FlowIssue
+  // Schemas: Map;
 
   constructor (api: string, httpOptions: Object) {
     const interfaces = {
@@ -65,16 +77,21 @@ export default class ApiClient extends DynamicInterface {
     super(interfaces);
     this.api = api;
     this.httpOptions = httpOptions;
-    this.cache = new Map();
+    this.Cache = new Map();
+    this.Interceptors = new Map();
+    this.Schemas = new Map();
   }
 
   async serialize (api?: string = this.api) {
-    if (this.cache.has(api)) return this.cache.get(api);
+    if (this.Cache.has(api)) return this.Cache.get(api);
     console.log('run api serialization');
     try {
       const { resources, schemas, baseUrl: baseURL } = await ApiDiscovery.getRest(api, { fields: 'resources,schemas,baseUrl' });
       const resourceHandlers = this.buildResources(resources, schemas, { baseURL, ...this.httpOptions });
-      this.cache.set(api, resourceHandlers);
+      // $FlowIssue
+      this.Cache.set(api, resourceHandlers);
+      // $FlowIssue
+      this.Schemas.set(api, schemas);
       return Object.assign({}, resourceHandlers);
     } catch (error) {
       console.error(error);
@@ -84,14 +101,7 @@ export default class ApiClient extends DynamicInterface {
 
   validator ({ id, description }, { required, defaults }) {
     const keywords = ['multipleOf', 'maximum', 'exclusiveMaximum', 'minimum', 'exclusiveMinimum', 'maxLength', 'minLength', 'pattern', 'items', 'additionalItems', 'maxItems', 'minItems', 'uniqueItems', 'contains', 'maxProperties', 'minProperties', 'required', 'properties', 'patternProperties', 'additionalProperties', 'dependencies', 'propertyNames', 'enum', 'const', 'type', 'allOf', 'anyOf', 'oneOf', 'not'];
-    const ajv = new Ajv({
-      allErrors: true,
-      useDefaults: true,
-      // removeAdditional: true,
-      coerceTypes: true,
-      unknownFormats: ['uint32', 'int32', 'uint64', 'int64', 'double'],
-      validateSchema: false
-    });
+    const ajv = new Ajv(VALIDATOROPTIONS);
     const schema = {
       'type': 'object',
       'id': id,
@@ -123,6 +133,23 @@ export default class ApiClient extends DynamicInterface {
     return this.validator({ id, description }, { required, defaults }, schema);
   }
 
+  responseValidator (schema: Object | string | void, data: Object | void) {
+    const ajv = new Ajv(VALIDATOROPTIONS);
+    if (!this.Schemas.has(this.api)) return;
+    const schemas = this.Schemas.get(this.api);
+    Object.entries(schemas).map(([id, schema]) => {
+      console.log('adding shema', id);
+      return ajv.addSchema(schema, id);
+    });
+    // Ajv.prototype.validate.errorsText = ajv.errorsText.bind(ajv);
+    // ajv.validate.errorsText = ajv.errorsText.bind(ajv);
+    if (data) {
+      return ajv.validate(schema, data) ? true : ajv.errorsText();
+    } else {
+      return ajv.validate.bind(ajv);
+    }
+  }
+
   buildRequest (interceptor: Interceptor) : Function {
     return async (params?: Object, data?: Object) => {
       try {
@@ -140,13 +167,13 @@ export default class ApiClient extends DynamicInterface {
     const { response, request} = config;
     const interceptor = {
       $http,
-      request:  { name, schemas: schemas[ {...request  }.$ref ], $ref: {...request  }.$ref, ...{config}},
-      response: { name, schemas: schemas[ {...response }.$ref ], $ref: {...response }.$ref, ...{config}}
+      request:  { name, schemas: schemas[ {...request  }.$ref ], $ref: {...request  }.$ref, validator: this.responseValidator.bind(this), ...{config}},
+      response: { name, schemas: schemas[ {...response }.$ref ], $ref: {...response }.$ref, validator: this.responseValidator.bind(this), ...{config}}
     };
     $http.defaults.url = config.path;
     $http.defaults.method = config.httpMethod;
-    $http.interceptors.response.use(this.responseHandler, this.errorHandler);
-    $http.interceptors.request.use(this.requestHandler, this.errorHandler);
+    this.Interceptors.set('response', $http.interceptors.response.use(this.responseInterceptor.bind(interceptor), this.errorHandler));
+    this.Interceptors.set('request', $http.interceptors.request.use(this.requestInterceptor.bind(interceptor), this.errorHandler));
     const bypass = async (...args: any) => await $http(...args)
     return bypass.bind(interceptor);
   }
@@ -167,11 +194,25 @@ export default class ApiClient extends DynamicInterface {
     .entries(resources)
     .reduce((resources, [ name, { methods } ]) => ({ ...resources, ...{ [name]: this.buildMethods(methods, schemas, httpOptions) }}), {});
   }
-  responseHandler (response) {
-    return response;
+
+  responseInterceptor (response) {
+    const { schemas, validator } = this.response;
+    console.log('response this', schemas, typeof validator, Object.keys(response))
+    response.items = 'asdfadsfadsf';
+    const valid = validator(schemas.id, response);
+    console.log('valid? ', valid);
+    if (valid !== true)
+      console.log(typeof valid, valid)
+      // throw new Error(validator.errorsText());
+    else
+      return response;
   };
-  requestHandler (config) {
+
+  requestInterceptor (config) {
+    const { schemas } = this.request;
+    console.log('request schemas', schemas)
     return config;
   }
+
   errorHandler (error) { return Promise.reject(error); }
 }
