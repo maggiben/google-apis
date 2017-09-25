@@ -188,7 +188,7 @@ export default class ApiClient extends DynamicInterface {
   buildResources (resources, schemas, httpOptions) {
     return Object
       .entries(resources)
-      .reduce((resources, [ name, { methods } ]) => ({ ...resources, ...{ [name]: this.buildMethods(methods, schemas, httpOptions) }}), {});
+      .reduce((resources, [ name: string, { methods } ]) => ({ ...resources, ...{ [name]: this.buildMethods(methods, schemas, httpOptions) }}), {});
   }
 
   responseInterceptor (response) {
