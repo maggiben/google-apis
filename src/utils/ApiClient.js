@@ -38,15 +38,11 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 
-import axios from 'axios';
 import Ajv from 'ajv';
 import ApiDiscovery from  './ApiDiscovery';
 import DynamicInterface from './DynamicInterface';
 import { Http } from './Http';
 
-type Options = {
-  baseURL: string
-};
 type Interceptor = Object | Function | Promise<*>;
 
 const VALIDATOROPTIONS = {
@@ -116,18 +112,18 @@ export default class ApiClient extends DynamicInterface {
         throw new Error(ajv.errorsText());
       else
         return valid;
-    }
+    };
   }
 
-  validate ({ id, description }, parameters: Object, schema: Object) {
+  requestValidator (schema: Object, {id: string, description: string, parameters: Object}) {
     const required = Object
       .entries(parameters)
-      .filter(([ name, parameter ]) => parameter.required)
+      .filter((parameter) => parameter.required)
       .reduce((parameters, [ name, parameter ]) => ({ ...parameters, ...{ [name]: parameter }}), {});
 
     const defaults = Object
       .entries(parameters)
-      .filter(([ name, parameter ]) => parameter.default)
+      .filter((parameter) => parameter.default)
       .reduce((parameters, [ name, parameter ]) => ({ ...parameters, ...{ [name]: parameter }}), {});
 
     return this.validator({ id, description }, { required, defaults }, schema);
@@ -191,22 +187,20 @@ export default class ApiClient extends DynamicInterface {
 
   buildResources (resources, schemas, httpOptions) {
     return Object
-    .entries(resources)
-    .reduce((resources, [ name, { methods } ]) => ({ ...resources, ...{ [name]: this.buildMethods(methods, schemas, httpOptions) }}), {});
+      .entries(resources)
+      .reduce((resources, [ name, { methods } ]) => ({ ...resources, ...{ [name]: this.buildMethods(methods, schemas, httpOptions) }}), {});
   }
 
   responseInterceptor (response) {
     const { schemas, validator } = this.response;
     console.log('response this', schemas, typeof validator, Object.keys(response))
-    response.items = 'asdfadsfadsf';
     const valid = validator(schemas.id, response);
     console.log('valid? ', valid);
     if (valid !== true)
-      console.log(typeof valid, valid)
-      // throw new Error(validator.errorsText());
+      throw new Error('Invalid response');
     else
       return response;
-  };
+  }
 
   requestInterceptor (config) {
     const { schemas } = this.request;

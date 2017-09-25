@@ -95,6 +95,6 @@ const dynamicMethod = async function (playlistId: string) {
 // apiGetRestByApiName('youtube');
 // apiGetRest('youtube');
 // playlistItems('youtube');
-dynamicMethod(123);
+dynamicMethod('youtube');
 
 
