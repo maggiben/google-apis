@@ -39,7 +39,7 @@
 
 import axios from 'axios';
 import { URL, URLSearchParams } from 'url';
-import $http from './Http';
+import { Http } from './Http';
 
 type DirectoryItem = {
   discoveryRestUrl: string,
@@ -60,10 +60,14 @@ type ListParams = {
 
 export default class ApiDiscovery {
 
+  static $http = Http({
+    baseURL: 'https://www.googleapis.com'
+  });
+
   static async list (name: string, preferred?: boolean) : Promise<*> {
     try {
       const params: ListParams = { name, preferred };
-      const { items } = await $http.get('discovery/v1/apis', { params });
+      const { items } = await ApiDiscovery.$http.get('discovery/v1/apis', { params });
       if (params.name && items.length === 1) {
         return items.reverse().slice(-1).pop();
       } else {
@@ -78,7 +82,7 @@ export default class ApiDiscovery {
   static async getRest (api: string | DirectoryItem, params?: Object) : Promise<*> {
     try {
       const { discoveryRestUrl } = (typeof api === 'string' || api instanceof String) ? await ApiDiscovery.list(api) : api;
-      return await $http.get(discoveryRestUrl, { params });
+      return await ApiDiscovery.$http.get(discoveryRestUrl, { params });
     } catch (error) {
       return error;
     }
