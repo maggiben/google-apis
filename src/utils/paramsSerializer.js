@@ -41,7 +41,6 @@
 import querystring from 'querystring';
 
 export const paramsSerializer = function (params: Object) : string {
-  console.log('serialize:', params)
   const query = { ...params };
   const { fields, id } = query;
 
@@ -59,7 +58,7 @@ export const paramsSerializer = function (params: Object) : string {
   }
 
   // build querystring and clean null or undefined parameters
-  return querystring.stringify.apply(null, [ Object.entries(params)
+  return querystring.stringify.apply(null, [ Object.entries(query)
     .filter(param => param.slice(-1).pop() != null)
     .reduce((params, [param, value]) => ({...params, ...{ [param]: value }}), {})]);
 };
