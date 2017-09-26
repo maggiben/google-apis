@@ -38,41 +38,19 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 
-import querystring from 'querystring';
-import axios, { Axios } from 'axios';
+import axios from 'axios';
+import type {
+  AxiosXHRConfigBase,
+  AxiosXHRConfig
+} from 'axios';
+import { paramsSerializer } from './paramsSerializer';
 
-type Options = {
-  baseURL: string
+const defaults: AxiosXHRConfigBase<Object> = {
+  baseURL: 'https://www.googleapis.com',
+  paramsSerializer
 };
 
-export const Http = function (config) {
-
-  const sanitizeConfig = config => {
-    return {
-      url: path,
-      baseURL: baseUrl
-    };
-  };
-
-  const paramsSerializer = params => {
-    params = Object.assign({}, params);
-    const { fields, id } = params;
-    if (Array.isArray(fields) && fields.length) {
-      params.fields = fields.join(',');
-    }
-
-    if (Array.isArray(id) && id.length) {
-      params.id = id.join(',');
-      params.maxResults = id.length;
-    } else if (id && id.length) {
-      params.maxResults = id.split(',').length;
-    }
-    // build querystring and clean null or undefined parameters
-    const query = Object.entries(params)
-      .filter(param => param.slice(-1).pop() != null)
-      .reduce((acc, [key, value]) => Object.assign(acc, { [key]: value }), {});
-    return querystring.stringify(query);
-  };
+export const Http = function (baseConfig) {
 
   const responseHandler = response => {
     const { params } = response.config;
@@ -105,64 +83,10 @@ export const Http = function (config) {
     console.log(error.config);
     return Promise.reject(error);
   }
-
-  const defaults = {
-    baseURL: 'https://www.googleapis.com',
-    paramsSerializer: paramsSerializer
-  };
-
+  const config: $Shape<Object> = { ...defaults, ...baseConfig };
   const instance = axios.create({ defaults, ...config });
-  instance.instanceId = Math.random().toString(36).substr(2, 10).toUpperCase();
   instance.interceptors.response.use(responseHandler, errorHandler);
   instance.interceptors.request.use(requestHandler, errorHandler);
   return instance;
 }
 
-const config = {
-  baseURL: 'https://www.googleapis.com',
-  paramsSerializer(params) {
-    params = Object.assign({}, params);
-    const { fields, id } = params;
-    if (Array.isArray(fields) && fields.length) {
-      params.fields = fields.join(',');
-    }
-
-    if (Array.isArray(id) && id.length) {
-      params.id = id.join(',');
-      params.maxResults = id.length;
-    } else if (id && id.length) {
-      params.maxResults = id.split(',').length;
-    }
-    // build querystring and clean null or undefined parameters
-    const query = Object.entries(params)
-      .filter(param => param.slice(-1).pop() != null)
-      .reduce((acc, [key, value]) => Object.assign(acc, { [key]: value }), {});
-    return querystring.stringify(query);
-  }
-};
-
-const response = [function (response) {
-  const { params } = response.config;
-  if (!params) {
-    return response.data;
-  }
-  else if (Array.isArray(params.fields) && params.fields.length) {
-    console.log('fields skipped');
-  } else if (params.fields && params.fields.length) {
-    console.log('fields', params.fields.split(','));
-  }
-  return response.data;
-}, function (error) {
-  // Do something with response error
-  return Promise.reject(error);
-}];
-
-// $http.interceptors.request.use(config => {
-//   console.log('interceptors.request', config)
-//   return config;
-// })
-
-const $http = axios.create(Object.assign({}, config));
-$http.interceptors.response.use(...Array.from(response));
-$http.instanceId = Math.random().toString(36).substr(2, 10).toUpperCase();
-export default $http;

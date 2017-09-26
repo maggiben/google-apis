@@ -40,7 +40,6 @@
 
 import axios from 'axios';
 import ApiDiscovery from  './ApiDiscovery';
-import $http from './Http';
 
 type Options = {
   baseURL: string

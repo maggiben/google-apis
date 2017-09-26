@@ -44,7 +44,11 @@ import DynamicInterface from './DynamicInterface';
 import { Http } from './Http';
 
 type Interceptor = Object | Function | Promise<*>;
-
+type Request = {
+  id: string,
+  parameters: Object,
+  description?: string
+};
 const VALIDATOROPTIONS = {
   allErrors: true,
   useDefaults: true,
@@ -57,12 +61,9 @@ export default class ApiClient extends DynamicInterface {
 
   httpOptions: Object;
   api: string;
-  // $FlowIssue
-  // Cache: Map;
-  // $FlowIssue
-  // Interceptors: Map;
-  // $FlowIssue
-  // Schemas: Map;
+  Cache: Map<K, V>;
+  Interceptors: Map<K, V>;
+  Schemas: Map<K, V>;
 
   constructor (api: string, httpOptions: Object) {
     const interfaces = {
@@ -115,7 +116,8 @@ export default class ApiClient extends DynamicInterface {
     };
   }
 
-  requestValidator (schema: Object, {id: string, description: string, parameters: Object}) {
+  requestValidator (schema: Object, request: Request) {
+    const { parameters } = request;
     const required = Object
       .entries(parameters)
       .filter((parameter) => parameter.required)
@@ -134,7 +136,7 @@ export default class ApiClient extends DynamicInterface {
     if (!this.Schemas.has(this.api)) return;
     const schemas = this.Schemas.get(this.api);
     Object.entries(schemas).map(([id, schema]) => {
-      console.log('adding shema', id);
+      // console.log('adding shema', id);
       return ajv.addSchema(schema, id);
     });
     // Ajv.prototype.validate.errorsText = ajv.errorsText.bind(ajv);
@@ -160,7 +162,7 @@ export default class ApiClient extends DynamicInterface {
   buildInterceptor (schemas: Object, method: Object, httpOptions: Object) {
     const $http = Http(httpOptions);
     const [ name, config ] = method;
-    const { response, request} = config;
+    const { response, request } = config;
     const interceptor = {
       $http,
       request:  { name, schemas: schemas[ {...request  }.$ref ], $ref: {...request  }.$ref, validator: this.responseValidator.bind(this), ...{config}},
@@ -185,15 +187,17 @@ export default class ApiClient extends DynamicInterface {
     }, {});
   }
 
-  buildResources (resources, schemas, httpOptions) {
+  buildResources (resources, schemas, httpOptions?: Object) {
     return Object
       .entries(resources)
       .reduce((resources, [ name: string, { methods } ]) => ({ ...resources, ...{ [name]: this.buildMethods(methods, schemas, httpOptions) }}), {});
   }
 
-  responseInterceptor (response) {
+  responseInterceptor (response: Object) {
     const { schemas, validator } = this.response;
-    console.log('response this', schemas, typeof validator, Object.keys(response))
+
+    // console.log('response this', schemas, typeof validator, Object.keys(response))
+
     const valid = validator(schemas.id, response);
     console.log('valid? ', valid);
     if (valid !== true)
