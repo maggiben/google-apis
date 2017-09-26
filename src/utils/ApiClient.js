@@ -81,7 +81,7 @@ export default class ApiClient extends DynamicInterface {
 
   async serialize (api?: string = this.api) {
     if (this.Cache.has(api)) return this.Cache.get(api);
-    console.log('run api serialization');
+    console.log('DeSerializing %s', api);
     try {
       const { resources, schemas, baseUrl: baseURL } = await ApiDiscovery.getRest(api, { fields: 'resources,schemas,baseUrl' });
       const resourceHandlers = this.buildResources(resources, schemas, { baseURL, ...this.httpOptions });
