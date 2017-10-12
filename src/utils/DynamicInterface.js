@@ -37,14 +37,6 @@
 //                                                                           //
 ///////////////////////////////////////////////////////////////////////////////
 
-
-import axios from 'axios';
-import ApiDiscovery from  './ApiDiscovery';
-
-type Options = {
-  baseURL: string
-};
-
 type Interfaces = {
   serializer?: string
 };
@@ -57,13 +49,12 @@ function builder (target: any, serializer: Function) {
       const methods = await serializer();
       const method = resource.reduce((result, key) => result[key], methods);
       if (method) {
-        console.log(`Call method ${resource.join('.')}`);
         return method.apply(target, args);
       } else {
         throw new Error(`Mehod ${resource.join('.')} not available`);
       }
     } catch (error) {
-      console.log(error);
+      console.error(error);
       throw new Error(error);
     }
   };

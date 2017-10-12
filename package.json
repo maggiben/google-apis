@@ -1,6 +1,6 @@
 {
   "name": "@maggiben/google-apis",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "author": "Benjamin Maggi",
   "description": "Use Google API Discovery Service to build runtime client drivers to interact with Google APIs",
   "homepage": "https://github.com/maggiben/google-apis#readme",

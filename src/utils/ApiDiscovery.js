@@ -75,7 +75,7 @@ export default class ApiDiscovery {
       }
     } catch (error) {
       console.error(error);
-      return error;
+      throw new Error(error);
     }
   }
 
@@ -84,7 +84,8 @@ export default class ApiDiscovery {
       const { discoveryRestUrl } = (typeof api === 'string' || api instanceof String) ? await ApiDiscovery.list(api) : api;
       return await ApiDiscovery.$http.get(discoveryRestUrl, { params });
     } catch (error) {
-      return error;
+      console.error(error);
+      throw new Error(error);
     }
   }
 
@@ -96,7 +97,7 @@ export default class ApiDiscovery {
       return this;
     } catch (error) {
       console.error(error);
-      return error;
+      throw new Error(error);
     }
   }
 
@@ -111,7 +112,7 @@ export default class ApiDiscovery {
       return await this.getRest(api, params);
     } catch (error) {
       console.error(error);
-      return error;
+      throw new Error(error);
     }
   }
 }

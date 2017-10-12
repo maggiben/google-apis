@@ -195,11 +195,8 @@ export default class ApiClient extends DynamicInterface {
 
   responseInterceptor (response: Object) {
     const { schemas, validator } = this.response;
-
     // console.log('response this', schemas, typeof validator, Object.keys(response))
-
     const valid = validator(schemas.id, response);
-    console.log('valid? ', valid);
     if (valid !== true)
       throw new Error('Invalid response');
     else
@@ -208,7 +205,6 @@ export default class ApiClient extends DynamicInterface {
 
   requestInterceptor (config) {
     const { schemas } = this.request;
-    console.log('request schemas', schemas)
     return config;
   }
 
