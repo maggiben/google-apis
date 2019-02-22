@@ -86,7 +86,7 @@ export default class DynamicInterface {
         if (Reflect.has(object, property)) {
           return Reflect.get(object, property);
         } else {
-          const { serializer } = interfaces[property];
+          const { serializer } = interfaces[property] ? interfaces[property] : undefined;
           return serializer ? builder(object, Reflect.get(object, serializer).bind(object)) : Reflect.get(object, property, receiver);
         }
       }

@@ -23,27 +23,26 @@ import ApiClient from '../../src/utils/ApiClient';
 
 // });
 
-describe('Test ApiClient', function() {
+// describe('Test ApiClient', function() {
 
-  beforeEach(() => {
-    nock.disableNetConnect();
-    nock('https://www.googleapis.com')
-      .get('/discovery/v1/apis')
-      .query({ name: 'youtube' })
-      .reply(200, { token: 1 });
-  });
+//   beforeEach(() => {
+//     nock.disableNetConnect();
+//     nock('https://www.googleapis.com')
+//       .get('/discovery/v1/apis')
+//       .query({ name: 'youtube' })
+//       .reply(200, { token: 'AIzaSyAPBCwcnohnbPXScEiVMRM4jYWc43p_CZU' });
+//   });
 
-  afterEach(() => nock.cleanAll());
+//   afterEach(() => nock.cleanAll());
 
-  it('it should get playlistItems', async function () {
-    const client = new ApiClient();
-    const directory = await client.get('discovery/v1/apis', { name: 'youtube' });
-    expect(1).to.equal(1);
-  });
+//   it('it should get playlistItems', async function () {
+//     const client = new ApiClient();
+//     const directory = await client.get('discovery/v1/apis', { name: 'youtube' });
+//     expect(1).to.equal(1);
+//   });
 
-});
+// });
 
-/*
 import chai from 'chai';
 import axios from 'axios';
 import skeemas from 'skeemas';
@@ -169,4 +168,3 @@ describe('Test urlshortener ApiClient', function() {
   });
 });
 
-*/
